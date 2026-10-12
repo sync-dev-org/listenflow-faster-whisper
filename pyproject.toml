@@ -1,0 +1,101 @@
+[project]
+name = "listenflow-faster-whisper"
+dynamic = ["version"]
+description = "faster-whisper engine module for listenflow"
+license = "MIT"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "faster-whisper==1.2.1",
+    "listenflow>=0.17.0",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "nvidia-cublas-cu12>=12.9.1.4,<12.10",
+]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0.dev0"
+
+[tool.hatch.version.raw-options]
+root = "."
+relative_to = "pyproject.toml"
+version_scheme = "only-version"
+local_scheme = "no-local-version"
+tag_regex = "^v(?P<version>[^/]+)$"
+git_describe_command = [
+    "git",
+    "describe",
+    "--dirty",
+    "--tags",
+    "--long",
+    "--exact-match",
+    "--match",
+    "v*",
+]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/listenflow/faster_whisper/_version.py"
+
+[tool.hatch.build]
+dev-mode-dirs = ["src"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.nf/",
+    "/.github/",
+    "/AGENTS.md",
+    "/CLAUDE.md",
+    "/tools/",
+    "/noren.yaml",
+    "/noren-words.txt",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src/listenflow/faster_whisper"]
+sources = ["src"]
+
+[dependency-groups]
+dev = [
+    "mkdocs-material>=9.7.7",
+    "mkdocstrings[python]>=1.0.6",
+    "noren==0.2.0",
+    "packaging>=24.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+    "gpu: opt-in integration tests that require a usable CUDA GPU and runtime libraries",
+    "req(id): ID of the spec item an externally visible behavior test verifies",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+exclude = [
+    ".git",
+    ".nf",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    "build",
+    "dist",
+    "**/_version.py",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/listenflow/faster_whisper/__init__.py" = ["B008", "I001"]
+"tests/test_faster_whisper_engine.py" = ["I001", "RUF012"]

@@ -1,0 +1,60 @@
+Warm-up speech asset attribution
+
+Source identity
+---------------
+
+The packaged clip is derived from librosa example `libri1`, path
+`5703-47212-0000`, from the LibriSpeech ASR corpus, identifier SLR12:
+https://www.openslr.org/12/
+
+OpenSLR states that LibriSpeech was prepared by Vassil Panayotov with the
+assistance of Daniel Povey and was derived from read audiobooks from the
+LibriVox project.
+
+The librosa example index describes `libri1` as:
+"The Ashiel Mystery: A Detective Story, chapter XVI. / Read by Garth Comira"
+https://raw.githubusercontent.com/librosa/librosa/main/librosa/util/example_data/index.json
+
+The librosa TOML sidecar records:
+
+- title: "The Ashiel Mystery"
+- attribution: "Marion Bryce (author), Garth Comira (reader)"
+- description: "An excerpt from The Ashiel Mystery: A Detective Story, chapter XVI."
+- license: "CC-BY-4.0"
+- corpus: "LibriSpeech SLR12"
+- URL: "https://www.openslr.org/12/"
+
+Source:
+https://raw.githubusercontent.com/librosa/data/main/audio/5703-47212-0000.toml
+
+The supplied librosa text sidecar notice, reproduced verbatim, is:
+
+"Ashiel Mystery - A Detective Story, chapter 2, narrated by Garth Comira
+From the LibriSpeech SLR12 collection: https://www.openslr.org/12/
+CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/"
+
+Source:
+https://raw.githubusercontent.com/librosa/data/main/audio/5703-47212-0000.txt
+
+The supplied metadata disagrees about the chapter ("XVI" in the index and
+TOML sidecar, "2" in the text sidecar). Both notices are reproduced as
+supplied; this attribution does not resolve the discrepancy.
+
+Modifications
+-------------
+
+The repository fixture-generation script converted the librosa OGG source
+with ffmpeg to a 16 kHz, mono, signed 16-bit little-endian (s16le) PCM WAVE.
+The packaged `warmup_speech_16khz_mono_s16le.pcm` is an exact 1.000-second
+crop of that conversion, starting at offset 0.250 seconds (sample 4,000) and
+ending immediately before offset 1.250 seconds (16,000 samples, 32,000
+bytes). The samples were not resampled or otherwise altered after the crop.
+
+License
+-------
+
+The source recording and this crop are provided under CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/
+
+This notice attributes the packaged speech data; it does not change the
+license of the listenflow-faster-whisper code distribution.
