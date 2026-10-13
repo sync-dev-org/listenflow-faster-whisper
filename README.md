@@ -114,10 +114,11 @@ to prepare on entry and close on exit. A second successful `prepare()` does noth
 Preparation failures leave the engine unprepared and allow an explicit retry with
 the same profile. Missing native components, CUDA libraries, or devices are reported
 by preparation failure when the runtime provides a classifiable exception.
-Preparation reads its one-second natural-speech stimulus from package data in the
+Preparation reads its synthetic speech stimulus from package data in the
 installed `listenflow.faster_whisper` subtree. The stimulus is qualified under the
 default `FasterWhisperSilenceMitigation` on the measured `small` and `large-v3`
-CPU/`int8` and CUDA/`float16` combinations; those measurements are evidence, not a
+CPU/`int8` and CUDA/`float16` combinations and uses the full utterance (1.36 seconds).
+Those measurements are evidence, not a
 compatibility allowlist or performance threshold. Caller-selected transcription and
 silence-mitigation values pass through to warm-up unchanged, with the same upstream
 outcomes and failure semantics and no retry or fallback. The engine uses no caller
@@ -125,13 +126,13 @@ path, repository fixture, model asset, or network access for the stimulus, compl
 drains its segment iterator before publishing readiness, and excludes warm-up PCM and
 segments from public health counters and events.
 
-As a loading-time guide, offline `large-v3` preparation, including the one-second
-speech warm-up and runtime readback, took **9.9–10.3 seconds** in three fresh Python
+As a loading-time guide, offline `large-v3` preparation, including the full synthetic
+speech warm-up (1.36 seconds) and runtime readback, took **8.4–9.2 seconds** in three fresh Python
 processes with already cached model files. The measurement used an Intel Core Ultra
 5 235 CPU, four CPU threads, `device="cpu"`, requested `compute_type="int8"`
 (effective `int8_float32`), beam size 1, default silence mitigation, Linux x86_64,
 Python 3.13.15, faster-whisper 1.2.1, and CTranslate2 4.8.2. Model loading took
-4.3–4.6 seconds and warm-up took 5.4–5.9 seconds of that total. These figures are a
+3.8–4.3 seconds and warm-up took 4.6–4.9 seconds of that total. These figures are a
 guide for that configuration; storage caches, host load, model weights, decoding
 settings, and runtime profile affect preparation time. The engine imposes no
 deadline; callers can apply `asyncio.timeout()` and allow for native cleanup.
@@ -226,7 +227,7 @@ uv run --extra cuda pytest -m gpu
 
 CUDA tests require `LISTENFLOW_FASTER_WHISPER_CUDA_TEST=1` as well as the model
 directory variable for the selected model. A test whose required variables are
-absent skips. Coordinate GPU use with other users of a shared host.
+absent skips.
 
 The language-set checks read only model metadata and need no `model.bin`:
 
@@ -237,8 +238,18 @@ LISTENFLOW_FASTER_WHISPER_SMALL_EN_METADATA_DIR=/absolute/path/to/small.en/metad
 uv run pytest -k reference_metadata
 ```
 
-The reference audio `tests/fixtures/libri1_16khz_mono_s16le.wav` is tracked, and
-`tests/fixtures/generate_libri1_fixture.sh` records its source and conversion.
+The synthetic reference audio `tests/fixtures/small_boat_16khz_mono_s16le.wav`
+is tracked. `tests/fixtures/small_boat_speech_record.txt` records its model,
+voice, settings, and spoken text. If you have the two source WAV files whose SHA-256
+digests are listed in the warm-up and fixture speech records, reproduce the fixture
+and packaged warm-up conversion from the repository root:
+
+```console
+bash tests/fixtures/generate_synthetic_speech.sh warmup-good-morning.wav fixture-small-boat.wav
+```
+
+The script verifies both source SHA-256 digests before converting their full
+utterances to 16 kHz mono s16le. The recorded conversion uses FFmpeg 8.0.1-3ubuntu2.
 
 ## Versioning
 
@@ -248,11 +259,29 @@ non-release fallback version `0.0.0.dev0`.
 
 ## Documentation
 
-The [documentation guide](docs/index.md) includes the
-[public API reference](docs/api/faster_whisper.md).
+The [documentation guide](https://sync-dev-org.github.io/listenflow-faster-whisper/)
+includes the
+[public API reference](https://sync-dev-org.github.io/listenflow-faster-whisper/api/faster_whisper/).
+
+## Development
+
+Run from the repository root:
+
+```console
+uv sync
+uv lock --check
+uv run pytest
+uv run ruff check
+uv run ruff format --check
+uv build
+uv run mkdocs build --strict
+```
 
 ## License
 
-The code is licensed under [MIT](LICENSE). The packaged warm-up recording is
-provided under CC BY 4.0; its sources, attribution, and modifications are recorded
-in [the speech-data notice](src/listenflow/faster_whisper/warmup_speech_attribution.txt).
+The code and both packaged synthetic speech assets are licensed under
+[MIT](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/LICENSE).
+The model, runtime, voice, settings, spoken text, and conversion are recorded in
+[the warm-up speech record](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/src/listenflow/faster_whisper/warmup_speech_attribution.txt)
+and
+[the test-fixture speech record](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/tests/fixtures/small_boat_speech_record.txt).

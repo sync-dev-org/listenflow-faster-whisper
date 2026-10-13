@@ -72,8 +72,8 @@ _LARGE_V3_DIGESTS = {
         "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
     ),
 }
-_REFERENCE_AUDIO_SIZE = 474_958
-_REFERENCE_AUDIO_DIGEST = "86af93041801af297754504d195ad9b05170b667c712983972342897b93d064c"
+_REFERENCE_AUDIO_SIZE = 373_804
+_REFERENCE_AUDIO_DIGEST = "f80e9a97d1294af40e1f6076454437825388d4ceff87542abd1127bf1ae587bb"
 _SMALL_EN_METADATA_DIGESTS = {
     "config.json": "666a9605530ac1f61fa8177f3702b4dacec9966749e42610839fcc32661d5fae",
     "tokenizer.json": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
@@ -296,7 +296,7 @@ def _assert_reference_language_set(
 
 
 def _read_verified_reference_audio() -> bytes:
-    fixture_path = Path(__file__).parent / "fixtures" / "libri1_16khz_mono_s16le.wav"
+    fixture_path = Path(__file__).parent / "fixtures" / "small_boat_16khz_mono_s16le.wav"
     assert fixture_path.stat().st_size == _REFERENCE_AUDIO_SIZE
     assert hashlib.sha256(fixture_path.read_bytes()).hexdigest() == _REFERENCE_AUDIO_DIGEST
     with wave.open(str(fixture_path), "rb") as fixture:
@@ -304,6 +304,16 @@ def _read_verified_reference_audio() -> bytes:
         assert fixture.getnchannels() == 1
         assert fixture.getsampwidth() == 2
         return fixture.readframes(fixture.getnframes())
+
+
+@pytest.mark.req("SP-LFFASTERWHISPER-004")
+def test_reference_speech_fixture_matches_the_approved_synthesis() -> None:
+    """Offline transcription uses the complete approved 11.68-second synthetic speech fixture."""
+
+    pcm = _read_verified_reference_audio()
+
+    assert len(pcm) == 373_760
+    assert any(sample for (sample,) in struct.iter_unpack("<h", pcm))
 
 
 class FakeWhisperModel:
@@ -1161,7 +1171,7 @@ async def test_ac_12_1_voiced_warmup_drains_before_readiness_without_public_prog
     assert engine.health().state is EngineState.READY
     audio, _ = model.transcribe_calls[0]
     assert any(audio), "preparation input must contain speech, not digital silence"
-    assert len(audio) == 16_000, "the one-second preparation clip is interpreted at 16 kHz"
+    assert len(audio) == 21_760, "the full 1.36-second synthetic utterance is interpreted at 16 kHz"
 
 
 @pytest.mark.req("SP-LFFASTERWHISPER-002")

@@ -2,12 +2,29 @@
 name = "listenflow-faster-whisper"
 dynamic = ["version"]
 description = "faster-whisper engine module for listenflow"
+readme = "README.md"
+authors = [{ name = "minamik", email = "mia@sync.dev" }]
 license = "MIT"
 requires-python = ">=3.12,<3.14"
+keywords = ["stt", "speech-to-text", "speech-recognition", "faster-whisper", "whisper"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "faster-whisper==1.2.1",
     "listenflow>=0.17.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/sync-dev-org/listenflow-faster-whisper"
+Documentation = "https://sync-dev-org.github.io/listenflow-faster-whisper/"
 
 [project.optional-dependencies]
 cuda = [

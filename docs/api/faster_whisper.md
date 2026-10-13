@@ -19,8 +19,8 @@ are omitted from the faster-whisper call unless changed. Audio must be 16 kHz mo
 PCM, with whole samples in the configured signed 16-bit little-endian or
 little-endian float32 format.
 
-`prepare()` loads the offline model and drains packaged-speech warm-up before
-publishing readiness. A successful preparation is reused; an unsuccessful attempt
+`prepare()` loads the offline model and drains the full packaged synthetic utterance
+(1.36 seconds) before publishing readiness. A successful preparation is reused; an unsuccessful attempt
 leaves no published partial model or status. `stream()` requires preparation and
 returns an asynchronous transcript iterator. Consume only one stream per instance
 and close the iterator explicitly when stopping early. Cancellation and closure

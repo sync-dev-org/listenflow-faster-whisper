@@ -4,6 +4,7 @@ import ast
 import copy
 import email
 import email.message
+import hashlib
 import importlib
 import importlib.metadata
 import io
@@ -54,6 +55,8 @@ MODULE_EXPORTS = {
     "FasterWhisperSilenceMitigation",
     "__version__",
 }
+WARMUP_PCM_SIZE = 43_520
+WARMUP_PCM_DIGEST = "f86d84f3af2bb18ac17fcfbd44108144e9a31f3fa0aaceef77a6deb9a2e1f6b9"
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -203,12 +206,13 @@ def _commit_module_copy(repository: Path) -> str:
     repository.mkdir()
     _git("init", "--quiet", "--initial-branch=main", str(repository), cwd=repository.parent)
     shutil.copy(REPOSITORY_ROOT / "pyproject.toml", repository / "pyproject.toml")
+    shutil.copy(REPOSITORY_ROOT / "README.md", repository / "README.md")
     shutil.copytree(
         REPOSITORY_ROOT / "src",
         repository / "src",
         ignore=shutil.ignore_patterns("__pycache__", "_version.py"),
     )
-    _git("add", "pyproject.toml", "src", cwd=repository)
+    _git("add", "pyproject.toml", "README.md", "src", cwd=repository)
     _git(
         "-c",
         "user.name=fixture",
@@ -251,7 +255,7 @@ def _wheel_metadata(wheel: Path) -> tuple[email.message.Message, set[str]]:
         metadata_path = next(
             name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
         )
-        metadata = email.message_from_bytes(archive.read(metadata_path))
+        metadata = email.message_from_string(archive.read(metadata_path).decode("utf-8"))
         files = set(archive.namelist())
     return metadata, files
 
@@ -625,6 +629,108 @@ def warmup_wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return next(wheelhouse.glob("listenflow_faster_whisper-*.whl"))
 
 
+@pytest.mark.req("SP-LFFASTERWHISPER-016")
+def test_wheel_publishes_the_markdown_readme(warmup_wheel: Path) -> None:
+    """PyPI receives the complete README with its Markdown content type."""
+
+    metadata, _ = _wheel_metadata(warmup_wheel)
+
+    assert metadata["Description-Content-Type"] == "text/markdown"
+    assert metadata.get_payload().rstrip("\n") == (
+        (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8").rstrip("\n")
+    )
+
+
+@pytest.mark.req("SP-LFFASTERWHISPER-016")
+def test_wheel_identifies_the_author(warmup_wheel: Path) -> None:
+    """Published metadata gives users the author's name and contact address."""
+
+    metadata, _ = _wheel_metadata(warmup_wheel)
+
+    assert metadata["Author-email"] == "minamik <mia@sync.dev>"
+
+
+@pytest.mark.req("SP-LFFASTERWHISPER-016")
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        (
+            "Project-URL",
+            {
+                "Repository, https://github.com/sync-dev-org/listenflow-faster-whisper",
+                "Documentation, https://sync-dev-org.github.io/listenflow-faster-whisper/",
+            },
+        ),
+        ("Keywords", {"stt", "speech-to-text", "speech-recognition", "faster-whisper", "whisper"}),
+        (
+            "Classifier",
+            {
+                "Development Status :: 3 - Alpha",
+                "Intended Audience :: Developers",
+                "License :: OSI Approved :: MIT License",
+                "Programming Language :: Python :: 3",
+                "Programming Language :: Python :: 3.12",
+                "Programming Language :: Python :: 3.13",
+                "Topic :: Multimedia :: Sound/Audio :: Speech",
+                "Topic :: Software Development :: Libraries :: Python Modules",
+            },
+        ),
+    ],
+)
+def test_wheel_publishes_discovery_metadata(
+    warmup_wheel: Path, field: str, expected: set[str]
+) -> None:
+    """PyPI users can find public project links and speech recognition package information."""
+
+    metadata, _ = _wheel_metadata(warmup_wheel)
+    values = (
+        metadata.get("Keywords", "").split(",")
+        if field == "Keywords"
+        else metadata.get_all(field, [])
+    )
+
+    assert set(values) == expected
+
+
+@pytest.mark.req("SP-LFFASTERWHISPER-016")
+def test_readme_links_resolve_from_the_pypi_page() -> None:
+    """README links use absolute public URLs that work on PyPI as well as GitHub."""
+
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    links = re.findall(r"\[[^\]]+\]\(([^)\s]+)\)", readme)
+
+    assert links, "the README must link to documentation and license notices"
+    assert all(urlsplit(link).scheme == "https" and urlsplit(link).netloc for link in links), (
+        f"README links must use absolute HTTPS URLs: {links}"
+    )
+
+
+@pytest.mark.req("SP-LFFASTERWHISPER-004")
+@pytest.mark.req("SP-LFFASTERWHISPER-009")
+def test_speech_conversion_rejects_unapproved_inputs_before_writing_assets(tmp_path: Path) -> None:
+    """Conversion rejects a source checksum mismatch before changing either distributed asset."""
+
+    fixture_directory = tmp_path / "tests/fixtures"
+    fixture_directory.mkdir(parents=True)
+    script = fixture_directory / "generate_synthetic_speech.sh"
+    shutil.copy(REPOSITORY_ROOT / "tests/fixtures" / script.name, script)
+    warmup = tmp_path / "src/listenflow/faster_whisper/warmup_speech_16khz_mono_s16le.pcm"
+    warmup.parent.mkdir(parents=True)
+    warmup.write_bytes(b"existing warm-up")
+    fixture = fixture_directory / "small_boat_16khz_mono_s16le.wav"
+    fixture.write_bytes(b"existing fixture")
+    source = tmp_path / "unapproved.wav"
+    source.write_bytes(b"unapproved audio")
+
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        _run("bash", str(script), str(source), str(source), cwd=tmp_path)
+
+    assert "SHA-256 mismatch" in failure.value.stderr
+    assert hashlib.sha256(source.read_bytes()).hexdigest() in failure.value.stderr
+    assert warmup.read_bytes() == b"existing warm-up"
+    assert fixture.read_bytes() == b"existing fixture"
+
+
 @pytest.mark.req("SP-LFFASTERWHISPER-009")
 def test_ac_12_2_wheel_contains_speech_and_attribution(warmup_wheel: Path) -> None:
     """The wheel includes one voiced warm-up asset and its source and license attribution."""
@@ -639,6 +745,8 @@ def test_ac_12_2_wheel_contains_speech_and_attribution(warmup_wheel: Path) -> No
             and "__pycache__" not in Path(member.filename).parts
             and not any(part.endswith(".dist-info") for part in Path(member.filename).parts)
         }
+        pcm = package_files["listenflow/faster_whisper/warmup_speech_16khz_mono_s16le.pcm"]
+        assert hashlib.sha256(pcm).hexdigest() == WARMUP_PCM_DIGEST
         speech_files = []
         for name, content in package_files.items():
             try:
@@ -654,7 +762,9 @@ def test_ac_12_2_wheel_contains_speech_and_attribution(warmup_wheel: Path) -> No
                 if content[8:12] == b"WAVE":
                     continue
                 pcm = content
-            if len(pcm) == 32_000 and any(sample for (sample,) in struct.iter_unpack("<h", pcm)):
+            if len(pcm) == WARMUP_PCM_SIZE and any(
+                sample for (sample,) in struct.iter_unpack("<h", pcm)
+            ):
                 speech_files.append(name)
         assert len(speech_files) == 1, "wheel must ship one short speech asset in its owned subtree"
         speech = speech_files[0]
@@ -666,22 +776,22 @@ def test_ac_12_2_wheel_contains_speech_and_attribution(warmup_wheel: Path) -> No
                 except UnicodeDecodeError:
                     continue
         required = (
-            "LibriSpeech",
-            "SLR12",
-            "libri1",
-            "CC BY 4.0",
-            "https://creativecommons.org/licenses/by/4.0/",
+            "Qwen3-TTS-12Hz-1.7B-CustomVoice",
+            "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+            "qwentts.cpp",
+            "Aiden",
+            "MIT",
         )
         matching = [note for note in notes if all(token in note for token in required)]
         assert matching, "speech data must have adjacent source and license attribution"
         assert any(
-            "crop" in note.lower()
+            "full" in note.lower()
             and re.search(r"16\s*(?:khz|,?000\s*hz)", note.lower())
             and "mono" in note.lower()
             and ("s16le" in note.lower() or "16-bit little-endian" in note.lower())
             and ("resampl" in note.lower() or "conver" in note.lower())
             for note in matching
-        ), "attribution must describe the crop and 16 kHz mono s16le conversion"
+        ), "attribution must describe the full utterance and 16 kHz mono s16le conversion"
 
 
 @pytest.mark.req("SP-LFFASTERWHISPER-001")
@@ -727,6 +837,7 @@ def test_ac_12_2_installed_wheel_prepares_offline_outside_checkout(
     )
     script = r"""
 import asyncio
+import hashlib
 import io
 import os
 from pathlib import Path
@@ -792,7 +903,7 @@ asyncio.run(prepare())
 assert not network_attempts, network_attempts
 assert len(inputs) == 1
 assert any(inputs[0]), "installed preparation input is silent"
-assert len(inputs[0]) == 16_000
+assert len(inputs[0]) == 21_760
 speech_files = []
 for path in tuple(opened):
     if (
@@ -813,8 +924,9 @@ for path in tuple(opened):
         if content[8:12] == b"WAVE":
             continue
         pcm = content
-    if len(pcm) != 32_000:
+    if len(pcm) != 43_520:
         continue
+    assert hashlib.sha256(pcm).hexdigest() == "f86d84f3af2bb18ac17fcfbd44108144e9a31f3fa0aaceef77a6deb9a2e1f6b9"
     samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768
     if np.array_equal(inputs[0], samples):
         speech_files.append((path, samples))
@@ -836,19 +948,20 @@ for path in speech.parent.iterdir():
     except UnicodeDecodeError:
         continue
 required = (
-    "LibriSpeech", "SLR12", "libri1", "CC BY 4.0",
-    "https://creativecommons.org/licenses/by/4.0/",
+    "Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "qwentts.cpp", "Aiden", "MIT",
 )
 matching = [note for note in notes if all(token in note for token in required)]
 assert matching, "speech data must have adjacent source and license attribution"
 assert any(
-    "crop" in note.lower()
+    "full" in note.lower()
     and re.search(r"16\s*(?:khz|,?000\s*hz)", note.lower())
     and "mono" in note.lower()
     and ("s16le" in note.lower() or "16-bit little-endian" in note.lower())
     and ("resampl" in note.lower() or "conver" in note.lower())
     for note in matching
-), "attribution must describe the crop and 16 kHz mono s16le conversion"
+), "attribution must describe the full utterance and 16 kHz mono s16le conversion"
 assert engine.runtime_status() is not None
 assert engine.health().state.value == "ready"
 assert set(model_directory.rglob("*")) == assets_before, "preparation acquired a model asset"

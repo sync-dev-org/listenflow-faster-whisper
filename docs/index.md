@@ -87,8 +87,9 @@ a multilingual vocabulary and false for an English-only vocabulary. Invalid
 settings and metadata raise `ConfigurationError` before recognition.
 
 `prepare()` validates model assets and feature-extractor consistency, loads the
-offline model, and drains a warm-up transcription using packaged speech. Warm-up
-uses the caller's decoding and silence-mitigation settings and needs no network or
+offline model, and drains a warm-up transcription using the full packaged synthetic
+utterance (1.36 seconds). Warm-up uses the caller's decoding and silence-mitigation
+settings and needs no network or
 additional model assets. It produces no public events or health-counter progress.
 Readiness and the immutable `runtime_status()` snapshot appear only after the load,
 warm-up drain, and runtime readback all succeed. The snapshot distinguishes the
@@ -153,9 +154,11 @@ contains the verification commands and asset-directory setup.
 
 Release versions come from exact `vX.Y.Z` tags and are published on PyPI. A
 checkout without a matching tag uses the non-release fallback `0.0.0.dev0`.
-The code is licensed under MIT. The packaged warm-up recording is licensed under
-CC BY 4.0, with sources, attribution, and modifications in
-[`warmup_speech_attribution.txt`](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/src/listenflow/faster_whisper/warmup_speech_attribution.txt).
+The code and both packaged synthetic speech assets are licensed under MIT.
+The model, runtime, voice, settings, spoken text, and conversion are recorded in
+[the warm-up speech record](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/src/listenflow/faster_whisper/warmup_speech_attribution.txt)
+and
+[the test-fixture speech record](https://github.com/sync-dev-org/listenflow-faster-whisper/blob/main/tests/fixtures/small_boat_speech_record.txt).
 
 ## API reference
 

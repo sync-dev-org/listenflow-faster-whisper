@@ -1,60 +1,57 @@
-Warm-up speech asset attribution
+Synthetic warm-up speech record
 
-Source identity
----------------
+Model and runtime
+-----------------
 
-The packaged clip is derived from librosa example `libri1`, path
-`5703-47212-0000`, from the LibriSpeech ASR corpus, identifier SLR12:
-https://www.openslr.org/12/
+Model: Qwen3-TTS-12Hz-1.7B-CustomVoice (Apache-2.0)
+https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
 
-OpenSLR states that LibriSpeech was prepared by Vassil Panayotov with the
-assistance of Daniel Povey and was derived from read audiobooks from the
-LibriVox project.
+GGUF Q8_0 weights (Apache-2.0):
+https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF
 
-The librosa example index describes `libri1` as:
-"The Ashiel Mystery: A Detective Story, chapter XVI. / Read by Garth Comira"
-https://raw.githubusercontent.com/librosa/librosa/main/librosa/util/example_data/index.json
+- Talker: qwen-talker-1.7b-customvoice-Q8_0.gguf
+  SHA-256: cab2cff67a0a557310febe558dc83076b28ed790e491867eb2751759f4cd89fa
+- Codec: qwen-tokenizer-12hz-Q8_0.gguf
+  SHA-256: 1883beeed99348fc35e23dd225e9082f93f6f8c109330a33d935baa8acdbfd94
 
-The librosa TOML sidecar records:
+Runtime: qwentts.cpp with ggml (both MIT), using the CUDA backend.
+Voice: built-in speaker Aiden. The synthesis used this built-in voice
+without a reference audio input.
+Settings: language="en", voice="Aiden", greedy decoding without sampling,
+seed 7. Two synthesis runs with these settings produced identical bytes.
 
-- title: "The Ashiel Mystery"
-- attribution: "Marion Bryce (author), Garth Comira (reader)"
-- description: "An excerpt from The Ashiel Mystery: A Detective Story, chapter XVI."
-- license: "CC-BY-4.0"
-- corpus: "LibriSpeech SLR12"
-- URL: "https://www.openslr.org/12/"
+Spoken text
+-----------
 
-Source:
-https://raw.githubusercontent.com/librosa/data/main/audio/5703-47212-0000.toml
+Good morning, everyone.
 
-The supplied librosa text sidecar notice, reproduced verbatim, is:
+Processing and conversion
+-------------------------
 
-"Ashiel Mystery - A Detective Story, chapter 2, narrated by Garth Comira
-From the LibriSpeech SLR12 collection: https://www.openslr.org/12/
-CC-BY 4.0 https://creativecommons.org/licenses/by/4.0/"
+The float32 synthesis output was converted to 16-bit samples with
+round(clip(x, -1, 1) * 32767). No volume normalization, silence trimming,
+or noise removal was applied. The source WAV is 24 kHz, mono, 16-bit PCM,
+1.36 seconds long:
+SHA-256: a98dae251f4153d028338319ef5217d2215d7a0db01e09682108c820d3a8999b
 
-Source:
-https://raw.githubusercontent.com/librosa/data/main/audio/5703-47212-0000.txt
+The full utterance was resampled to 16 kHz mono signed 16-bit little-endian
+(s16le) raw PCM using FFmpeg 8.0.1-3ubuntu2, libswresample 6.1.100:
 
-The supplied metadata disagrees about the chapter ("XVI" in the index and
-TOML sidecar, "2" in the text sidecar). Both notices are reproduced as
-supplied; this attribution does not resolve the discrepancy.
+ffmpeg -y -hide_banner -loglevel error -i warmup-good-morning.wav \
+  -map_metadata -1 -ac 1 -ar 16000 -c:a pcm_s16le \
+  -fflags +bitexact -flags:a +bitexact -f s16le \
+  warmup_speech_16khz_mono_s16le.pcm
 
-Modifications
--------------
+The resulting asset contains 21,760 samples (43,520 bytes), 1.36 seconds:
+SHA-256: f86d84f3af2bb18ac17fcfbd44108144e9a31f3fa0aaceef77a6deb9a2e1f6b9
 
-The repository fixture-generation script converted the librosa OGG source
-with ffmpeg to a 16 kHz, mono, signed 16-bit little-endian (s16le) PCM WAVE.
-The packaged `warmup_speech_16khz_mono_s16le.pcm` is an exact 1.000-second
-crop of that conversion, starting at offset 0.250 seconds (sample 4,000) and
-ending immediately before offset 1.250 seconds (16,000 samples, 32,000
-bytes). The samples were not resampled or otherwise altered after the crop.
+tests/fixtures/generate_synthetic_speech.sh verifies the source WAV
+checksums and reproduces this conversion from the repository root.
 
 License
 -------
 
-The source recording and this crop are provided under CC BY 4.0:
-https://creativecommons.org/licenses/by/4.0/
-
-This notice attributes the packaged speech data; it does not change the
-license of the listenflow-faster-whisper code distribution.
+This generated audio is distributed under the MIT license as part of
+listenflow-faster-whisper, together with its code. The synthesis model
+and GGUF weights retain their Apache-2.0 license as external synthesis
+inputs. The distribution contains the generated speech and this record.
