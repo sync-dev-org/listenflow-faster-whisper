@@ -197,7 +197,12 @@ class FasterWhisperSilenceMitigation:
     vad_min_silence_duration_ms: int = 500
     no_speech_threshold: float = 0.75
     condition_on_previous_text: bool = False
-    hallucination_silence_threshold_s: float | None = 1.0
+    hallucination_silence_threshold_s: float | None = None
+    """Seconds of silence to skip before a likely hallucinated segment.
+
+    faster-whisper reads this threshold only when the engine's `word_timestamps`
+    is `True`; with `word_timestamps=False` it has no effect. `None` disables it.
+    """
 
     def __post_init__(self) -> None:
         try:

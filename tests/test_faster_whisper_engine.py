@@ -2326,7 +2326,7 @@ async def test_ac_7_4_and_ac_7_5_prepare_forwards_offline_load_and_decode_profil
         "vad_parameters": {"threshold": 0.65, "min_silence_duration_ms": 500},
         "no_speech_threshold": 0.75,
         "condition_on_previous_text": False,
-        "hallucination_silence_threshold": 1.0,
+        "hallucination_silence_threshold": None,
     }
     assert engine.health().state is EngineState.READY
 

@@ -61,6 +61,10 @@ Thresholds must be in the inclusive range `0.0` to `1.0`, silence duration must 
 a nonnegative integer, and an enabled hallucination-silence threshold must be
 finite and positive. Boolean fields require boolean values.
 
+The hallucination-silence threshold is disabled by default. faster-whisper uses it
+only when the engine is constructed with `word_timestamps=True`; set both to skip
+long silences before likely hallucinated segments.
+
 ::: listenflow.faster_whisper.FasterWhisperSilenceMitigation
     options:
       members: [vad_filter, vad_threshold, vad_min_silence_duration_ms, no_speech_threshold, condition_on_previous_text, hallucination_silence_threshold_s, __init__]
