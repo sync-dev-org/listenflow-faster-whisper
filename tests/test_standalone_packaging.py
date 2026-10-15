@@ -92,12 +92,20 @@ def _assert_standalone_metadata(project: dict[str, Any], lock: dict[str, Any]) -
     uv_settings = project.get("tool", {}).get("uv", {})
     assert "listenflow" not in uv_settings.get("sources", {})
     assert "prerelease" not in uv_settings
+
+    def group_requirements(name: str) -> list[Requirement]:
+        requirements = []
+        for entry in project["dependency-groups"][name]:
+            if isinstance(entry, str):
+                requirements.append(Requirement(entry))
+            else:
+                requirements.extend(group_requirements(entry["include-group"]))
+        return requirements
+
     development_core = [
-        requirement
-        for requirement in project["dependency-groups"]["dev"]
-        if Requirement(requirement).name == "listenflow"
+        requirement for requirement in group_requirements("dev") if requirement.name == "listenflow"
     ]
-    assert not development_core
+    assert all(str(requirement) == "listenflow>=0.17.0" for requirement in development_core)
     return _assert_registry_locked_core(lock)
 
 
@@ -330,13 +338,16 @@ def test_standalone_metadata_and_lock_pin_a_pypi_core() -> None:
 
 @pytest.mark.req("SP-LFFASTERWHISPER-012")
 @pytest.mark.req("SP-LFFASTERWHISPER-019")
-def test_metadata_contract_rejects_a_dev_group_with_a_core_git_reference(tmp_path: Path) -> None:
-    """Development dependencies cannot override the published core with a Git reference."""
+@pytest.mark.parametrize("group", ["dev", "docs"])
+def test_metadata_contract_rejects_a_dev_group_with_a_core_git_reference(
+    tmp_path: Path, group: str
+) -> None:
+    """Direct and included development dependencies cannot override the core with a Git reference."""
 
     project = _read_toml(REPOSITORY_ROOT / "pyproject.toml")
     lock = _read_toml(REPOSITORY_ROOT / "uv.lock")
     git_reference = copy.deepcopy(project)
-    git_reference["dependency-groups"]["dev"].append(
+    git_reference["dependency-groups"][group].append(
         f"listenflow @ git+{(tmp_path / 'listenflow.git').as_uri()}@main"
     )
 
@@ -536,8 +547,8 @@ def test_module_wheel_owns_only_its_subtree_and_public_dependencies(tmp_path: Pa
 
 
 @pytest.mark.req("SP-LFFASTERWHISPER-018")
-def test_sdist_and_public_snapshot_exclude_the_same_development_files() -> None:
-    """The source distribution and public snapshot exclude the same development files."""
+def test_sdist_excludes_private_snapshot_files_and_all_github_configuration() -> None:
+    """The sdist excludes private snapshot files and all GitHub configuration."""
 
     configuration = REPOSITORY_ROOT / "noren.yaml"
     if not configuration.is_file() and not (REPOSITORY_ROOT / "AGENTS.md").is_file():
@@ -547,7 +558,12 @@ def test_sdist_and_public_snapshot_exclude_the_same_development_files() -> None:
     project = _read_toml(REPOSITORY_ROOT / "pyproject.toml")
     sdist = project["tool"]["hatch"]["build"]["targets"].get("sdist", {})
 
-    assert set(sdist.get("exclude", [])) == set(publication["exclude"].splitlines())
+    exclusions = set(sdist.get("exclude", []))
+    assert "/.github/" in exclusions
+    assert all(
+        any(path.startswith(excluded) for excluded in exclusions)
+        for path in publication["exclude"].splitlines()
+    )
 
 
 @pytest.mark.req("SP-LFFASTERWHISPER-019")

@@ -78,10 +78,13 @@ only-include = ["src/listenflow/faster_whisper"]
 sources = ["src"]
 
 [dependency-groups]
-dev = [
+docs = [
+    "listenflow>=0.17.0",
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
-    "noren==0.3.0",
+]
+dev = [
+    { include-group = "docs" },
     "packaging>=24.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
